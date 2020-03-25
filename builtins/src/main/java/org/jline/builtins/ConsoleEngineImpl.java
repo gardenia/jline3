@@ -1192,6 +1192,13 @@ public class ConsoleEngineImpl implements ConsoleEngine {
         return out;
     }
 
+    private boolean equalSets(Set<String> c1, Set<String> c2) {
+        if (c1.size() != c2.size()) {
+            return false;
+        }
+        return c1.containsAll(c2);
+    }
+
     @SuppressWarnings("unchecked")
     private List<AttributedString> highlight(Map<String, Object> options, Object obj) {
         List<AttributedString> out = new ArrayList<>();
@@ -1239,6 +1246,7 @@ public class ConsoleEngineImpl implements ConsoleEngine {
                             List<String> header = new ArrayList<>();
                             List<Integer> columns = new ArrayList<>();
                             int headerWidth = 0;
+                            Set<String> refKeys = map.keySet();
                             for (int i = 0; i < _header.size(); i++) {
                                 if (!map.containsKey(_header.get(i).split("\\.")[0])) {
                                     continue;
@@ -1258,13 +1266,19 @@ public class ConsoleEngineImpl implements ConsoleEngine {
                                     break;
                                 }
                             }
+                            if (header.size() == 0) {
+                                throw new Exception("No columns for table!");
+                            }
                             for (Object o : collection) {
                                 if (o.getClass() != elem.getClass()) {
-                                    throw new Exception();
+                                    throw new Exception("Not homogenous object list!");
+                                }
+                                Map<String, Object> m = convert ? objectToMap(options, o)
+                                                                : keysToString((Map<Object, Object>) o);
+                                if (o instanceof Map && !equalSets(m.keySet(), refKeys)) {
+                                    throw new Exception("Not homogenous map list!");
                                 }
                                 for (int i = 0; i < header.size(); i++) {
-                                    Map<String, Object> m = convert ? objectToMap(options, o)
-                                                                    : keysToString((Map<Object, Object>) o);
                                     int cw = highlightMapValue(options, header.get(i), m).columnLength();
                                     if (cw > columns.get(i) - 1) {
                                         columns.set(i, cw + 1);
@@ -1295,9 +1309,9 @@ public class ConsoleEngineImpl implements ConsoleEngine {
                                     asb2.append("\t");
                                     row++;
                                 }
+                                Map<String, Object> m = convert ? objectToMap(options, o)
+                                                                : keysToString((Map<Object, Object>) o);
                                 for (int i = 0; i < header.size(); i++) {
-                                    Map<String, Object> m = convert ? objectToMap(options, o)
-                                            : keysToString((Map<Object, Object>) o);
                                     AttributedString v = highlightMapValue(options, header.get(i), m);
                                     if (isNumber(v.toString())) {
                                         v = addPadding(v,
@@ -1367,7 +1381,8 @@ public class ConsoleEngineImpl implements ConsoleEngine {
     public List<AttributedString> highlightList(Map<String, Object> options, List<Object> collection, int width) {
         List<AttributedString> out = new ArrayList<>();
         Integer row = 0;
-        Integer tabsize = ((Integer) collection.size()).toString().length() + 1;
+        Integer tabsize = digits(collection.size()) + 2;
+        options.remove("maxColumnWidth");
         for (Object o : collection) {
             AttributedStringBuilder asb = new AttributedStringBuilder().tabs(tabsize);
             if (options.containsKey("rownum")) {
